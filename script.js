@@ -1,4 +1,3 @@
-// Get DOM elements
 const imageUpload = document.getElementById('imageUpload');
 const mainCanvas = document.getElementById('mainCanvas');
 const ctx = mainCanvas.getContext('2d');
@@ -7,6 +6,7 @@ const resetButton = document.getElementById('resetCanvas');
 const cutToolButton = document.getElementById('cutTool');
 const pickupToolButton = document.getElementById('pickupTool');
 const drawToolButton = document.getElementById('drawTool');
+const resizeToolButton = document.getElementById('resizeTool');
 
 // Access Matter.js modules
 const { Engine, Render, World, Bodies, Body, Vertices, Vector, Composite, MouseConstraint, Mouse, Query, Constraint } = Matter;
@@ -16,20 +16,25 @@ const canvasWidth = 1000;
 const canvasHeight = 700;
 
 // Variables
-let img = new Image();
+let images = [];
 let engine;
 let world;
 let mouseConstraint;
 let cutPieces = [];
 let isDrawing = false;
-let currentTool = 'cut'; // Default tool
+let currentTool = 'cut';
 let currentNeonPath = [];
 let finishedNeonLines = [];
-let drawingColor = '#00ffff'; // Default drawing color
+let drawingColor = '#00ffff';
 let permanentDrawings = [];
-let imageLoaded = false;
 let selectedBody = null;
 let grabConstraint = null;
+let resizeSlider = null;
+
+// New variables for improved cutting
+const minCutDistance = 5;
+let lastCutPoint = null;
+let cutIntensity = 0;
 
 // Color and style settings
 const neonLineWidth = 5;
@@ -37,16 +42,11 @@ const neonShadowBlur = 15;
 
 // Available drawing colors
 const colorOptions = [
-    '#00ffff', // Cyan
-    '#ff00ff', // Magenta
-    '#ffff00', // Yellow
-    '#ff0000', // Red
-    '#00ff00', // Green
-    '#0000ff', // Blue
-    '#ffffff'  // White
+    '#00ffff', '#ff00ff', '#ffff00',
+    '#ff0000', '#00ff00', '#0000ff', '#ffffff'
 ];
 
-// Initialize the physics engine
+// Initialize physics engine
 function initPhysics() {
     engine = Engine.create({
         enableSleeping: true,
@@ -55,7 +55,6 @@ function initPhysics() {
     world = engine.world;
     world.gravity.y = 0.5;
 
-    // Create mouse for interaction
     const mouse = Mouse.create(mainCanvas);
     mouseConstraint = MouseConstraint.create(engine, {
         mouse: mouse,
@@ -65,78 +64,41 @@ function initPhysics() {
         }
     });
     World.add(world, mouseConstraint);
-
-    // Create canvas boundaries to keep pieces inside
     createBoundaries();
 }
 
-// Create boundaries to keep pieces inside the canvas
+// Improved boundaries with buffer zone
 function createBoundaries() {
     const wallOptions = {
         isStatic: true,
-        restitution: 0.6,
-        friction: 0.1,
+        restitution: 0.8,
+        friction: 0.3,
         render: { visible: false }
     };
     
-    // Create boundaries slightly beyond canvas edges
-    const thickness = 50;
+    const thickness = 100;
+    const buffer = 50;
     
-    // Bottom boundary
-    const bottom = Bodies.rectangle(
-        canvasWidth / 2, 
-        canvasHeight + thickness / 2, 
-        canvasWidth + thickness * 2, 
-        thickness, 
-        wallOptions
-    );
-    
-    // Top boundary
-    const top = Bodies.rectangle(
-        canvasWidth / 2, 
-        -thickness / 2, 
-        canvasWidth + thickness * 2, 
-        thickness, 
-        wallOptions
-    );
-    
-    // Left boundary
-    const left = Bodies.rectangle(
-        -thickness / 2, 
-        canvasHeight / 2, 
-        thickness, 
-        canvasHeight + thickness * 2, 
-        wallOptions
-    );
-    
-    // Right boundary
-    const right = Bodies.rectangle(
-        canvasWidth + thickness / 2, 
-        canvasHeight / 2, 
-        thickness, 
-        canvasHeight + thickness * 2, 
-        wallOptions
-    );
-    
-    World.add(world, [bottom, top, left, right]);
+    World.add(world, [
+        Bodies.rectangle(canvasWidth/2, canvasHeight + thickness/2, canvasWidth + thickness*2, thickness, wallOptions), // bottom
+        Bodies.rectangle(canvasWidth/2, -thickness/2, canvasWidth + thickness*2, thickness, wallOptions), // top
+        Bodies.rectangle(-thickness/2, canvasHeight/2, thickness, canvasHeight + thickness*2, wallOptions), // left
+        Bodies.rectangle(canvasWidth + thickness/2, canvasHeight/2, thickness, canvasHeight + thickness*2, wallOptions) // right
+    ]);
 }
 
-// Reset the physics world
+// Reset physics world
 function resetPhysics() {
     World.clear(world);
     Engine.clear(engine);
     initPhysics();
     cutPieces = [];
+    images = [];
     finishedNeonLines = [];
     permanentDrawings = [];
     selectedBody = null;
-    if (grabConstraint) {
-        World.remove(world, grabConstraint);
-        grabConstraint = null;
-    }
-    if (imageLoaded) {
-        createImageBody();
-    }
+    if (grabConstraint) World.remove(world, grabConstraint);
+    grabConstraint = null;
 }
 
 // Setup canvas
@@ -145,100 +107,69 @@ function initCanvas() {
     mainCanvas.height = canvasHeight;
 }
 
-// Create the initial image body
-function createImageBody() {
-    // Calculate dimensions maintaining aspect ratio
-    const aspectRatio = img.width / img.height;
-    let imgWidth, imgHeight;
-    
-    if (aspectRatio > 1) {
-        // Landscape
-        imgWidth = Math.min(canvasWidth * 0.8, img.width);
-        imgHeight = imgWidth / aspectRatio;
-    } else {
-        // Portrait
-        imgHeight = Math.min(canvasHeight * 0.8, img.height);
-        imgWidth = imgHeight * aspectRatio;
-    }
+// Create image body with physics
+function createImageBody(imgSrc, x = canvasWidth/2, y = canvasHeight/2) {
+    const img = new Image();
+    img.onload = function() {
+        const aspectRatio = img.width / img.height;
+        let imgWidth = Math.min(canvasWidth * 0.6, img.width);
+        let imgHeight = imgWidth / aspectRatio;
 
-    // Create a rectangle for the image
-    const x = canvasWidth / 2;
-    const y = canvasHeight / 2;
-    
-    // Create image body vertices
-    const vertices = [
-        { x: -imgWidth/2, y: -imgHeight/2 },
-        { x: imgWidth/2, y: -imgHeight/2 },
-        { x: imgWidth/2, y: imgHeight/2 },
-        { x: -imgWidth/2, y: imgHeight/2 }
-    ];
-    
-    // Create the body
-    const body = Bodies.fromVertices(x, y, [vertices], {
-        isStatic: true,
-        friction: 0.1,
-        restitution: 0.6,
-        density: 0.001, // Lower density to make pieces lighter
-        render: { visible: true }
-    });
-    
-    World.add(world, body);
-    
-    // Create offscreen canvas for texture
-    const textureCanvas = document.createElement('canvas');
-    textureCanvas.width = imgWidth;
-    textureCanvas.height = imgHeight;
-    const textureCtx = textureCanvas.getContext('2d');
-    textureCtx.drawImage(img, 0, 0, imgWidth, imgHeight);
-    
-    // Add the piece to our tracking array
-    cutPieces.push({
-        body: body,
-        texture: textureCanvas,
-        originalWidth: imgWidth,
-        originalHeight: imgHeight,
-        // Store local vertices for drawing
-        localVertices: vertices
-    });
+        const vertices = [
+            { x: -imgWidth/2, y: -imgHeight/2 },
+            { x: imgWidth/2, y: -imgHeight/2 },
+            { x: imgWidth/2, y: imgHeight/2 },
+            { x: -imgWidth/2, y: imgHeight/2 }
+        ];
+
+        const body = Bodies.fromVertices(x, y, [vertices], {
+            friction: 0.3,
+            restitution: 0.6,
+            density: 0.001,
+            render: { visible: true }
+        });
+
+        const textureCanvas = document.createElement('canvas');
+        textureCanvas.width = imgWidth;
+        textureCanvas.height = imgHeight;
+        const textureCtx = textureCanvas.getContext('2d');
+        textureCtx.drawImage(img, 0, 0, imgWidth, imgHeight);
+
+        const newPiece = {
+            body: body,
+            texture: textureCanvas,
+            originalWidth: imgWidth,
+            originalHeight: imgHeight,
+            localVertices: vertices
+        };
+
+        cutPieces.push(newPiece);
+        World.add(world, body);
+    };
+    img.src = imgSrc;
 }
 
 // Event listeners for image upload
 imageUpload.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) {
+    const files = e.target.files;
+    for (let file of files) {
         const reader = new FileReader();
         reader.onload = (event) => {
-            img = new Image();
-            img.onload = () => {
-                imageLoaded = true;
-                resetPhysics();
-            };
-            img.src = event.target.result;
+            const randomX = 300 + Math.random() * (canvasWidth - 600);
+            const randomY = 200 + Math.random() * (canvasHeight - 400);
+            createImageBody(event.target.result, randomX, randomY);
         };
         reader.readAsDataURL(file);
     }
 });
 
-uploadNewButton.addEventListener('click', () => {
-    imageUpload.click();
-});
-
-resetButton.addEventListener('click', resetPhysics);
-
-// Tool selection
-cutToolButton.addEventListener('click', () => setActiveTool('cut'));
-pickupToolButton.addEventListener('click', () => setActiveTool('pickup'));
-drawToolButton.addEventListener('click', () => setActiveTool('draw'));
-
+// Tool selection with resize tool
 function setActiveTool(tool) {
     currentTool = tool;
-    
-    // Update button styling
-    [cutToolButton, pickupToolButton, drawToolButton].forEach(btn => {
+    [cutToolButton, pickupToolButton, drawToolButton, resizeToolButton].forEach(btn => {
         btn.classList.remove('active');
     });
     
-    // Set the active button
     if (tool === 'cut') {
         cutToolButton.classList.add('active');
         mainCanvas.style.cursor = 'crosshair';
@@ -248,87 +179,194 @@ function setActiveTool(tool) {
     } else if (tool === 'draw') {
         drawToolButton.classList.add('active');
         mainCanvas.style.cursor = 'pointer';
+    } else if (tool === 'resize') {
+        resizeToolButton.classList.add('active');
+        mainCanvas.style.cursor = 'cell';
     }
     
-    // Release any constraints when switching tools
     if (grabConstraint) {
         World.remove(world, grabConstraint);
         grabConstraint = null;
     }
+    hideResizeSlider();
 }
 
-// Draw a neon line effect
-function drawNeonLine(path, color = '#00ffff', opacity = 1) {
-    if (path.length < 2) return;
-
-    ctx.save();
-    ctx.lineWidth = neonLineWidth;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.shadowBlur = neonShadowBlur;
-    ctx.shadowColor = color.replace(')', `, ${opacity})`).replace('rgb', 'rgba');
-    ctx.strokeStyle = color.replace(')', `, ${opacity})`).replace('rgb', 'rgba');
+// Organic cutting implementation
+function smoothPath(points, tension = 0.5) {
+    if (points.length < 3) return points;
+    const smoothed = [points[0]];
     
-    ctx.beginPath();
-    ctx.moveTo(path[0].x, path[0].y);
-    
-    for (let i = 1; i < path.length; i++) {
-        ctx.lineTo(path[i].x, path[i].y);
+    for (let i = 1; i < points.length - 1; i++) {
+        const p0 = points[i-1];
+        const p1 = points[i];
+        const p2 = points[i+1];
+        
+        const avgX = (p0.x + p1.x + p2.x) / 3;
+        const avgY = (p0.y + p1.y + p2.y) / 3;
+        smoothed.push({ x: avgX, y: avgY });
     }
     
-    ctx.stroke();
-    ctx.restore();
+    smoothed.push(points[points.length-1]);
+    return smoothed;
 }
-// Mouse event handlers
-mainCanvas.addEventListener('mousedown', (e) => {
-    if (e.button === 0) { // Left mouse button
-        const mouseX = e.offsetX;
-        const mouseY = e.offsetY;
-        
-        if (currentTool === 'cut') {
-            // Only start drawing the cut line, no other behavior
-            isDrawing = true;
-            currentNeonPath = [{ x: mouseX, y: mouseY }];
-        } 
-        else if (currentTool === 'pickup') {
-            // Find body under cursor
-            const bodies = cutPieces.map(piece => piece.body);
-            const bodiesAtPoint = Query.point(bodies, { x: mouseX, y: mouseY });
+
+// Improved cutting mechanics
+function cutImageAlongPath(path) {
+    if (path.length < 5) return;
+    
+    const smoothedPath = smoothPath(path);
+    const currentPieces = [...cutPieces];
+    cutPieces = [];
+    
+    currentPieces.forEach(piece => {
+        if (doesPathIntersectPiece(smoothedPath, piece)) {
+            const newPieces = splitPieceWithPath(piece, smoothedPath);
+            World.remove(world, piece.body);
             
-            if (bodiesAtPoint.length > 0) {
-                selectedBody = bodiesAtPoint[0];
-                Body.setStatic(selectedBody, false);
-                
-                // Create constraint to drag the body
-                grabConstraint = Constraint.create({
-                    pointA: { x: mouseX, y: mouseY },
-                    bodyB: selectedBody,
-                    pointB: { x: 0, y: 0 },
-                    stiffness: 0.7,
-                    length: 0
+            if (newPieces && newPieces.length > 0) {
+                newPieces.forEach(newPiece => {
+                    cutPieces.push(newPiece);
+                    World.add(world, newPiece.body);
+                    Body.setStatic(newPiece.body, false);
+                    
+                    // Add organic movement
+                    const force = Vector.mult(Vector.normalise({
+                        x: (Math.random() - 0.5) * 0.1,
+                        y: -Math.random() * 0.1
+                    }), 0.005);
+                    Body.applyForce(newPiece.body, newPiece.body.position, force);
                 });
-                World.add(world, grabConstraint);
-                
-                mainCanvas.style.cursor = 'grabbing';
             }
-        } 
-        else if (currentTool === 'draw') {
-            isDrawing = true;
-            currentNeonPath = [{ x: mouseX, y: mouseY }];
+        } else {
+            cutPieces.push(piece);
+        }
+    });
+}
+
+// Resize tool implementation
+function showResizeSlider() {
+    if (!resizeSlider) {
+        resizeSlider = document.createElement('input');
+        resizeSlider.type = 'range';
+        resizeSlider.min = '50';
+        resizeSlider.max = '200';
+        resizeSlider.value = '100';
+        resizeSlider.className = 'resize-slider';
+        
+        resizeSlider.addEventListener('input', () => {
+            if (selectedBody) {
+                const scale = resizeSlider.value / 100;
+                resizeBody(selectedBody, scale);
+            }
+        });
+        
+        document.body.appendChild(resizeSlider);
+    }
+    resizeSlider.style.display = 'block';
+}
+
+function hideResizeSlider() {
+    if (resizeSlider) resizeSlider.style.display = 'none';
+}
+
+function resizeBody(body, scale) {
+    const originalPiece = cutPieces.find(p => p.body === body);
+    if (!originalPiece) return;
+
+    const newVertices = originalPiece.localVertices.map(v => ({
+        x: v.x * scale,
+        y: v.y * scale
+    }));
+
+    const newBody = Bodies.fromVertices(
+        body.position.x,
+        body.position.y,
+        [newVertices],
+        {
+            friction: 0.3,
+            restitution: 0.6,
+            density: 0.001 * (1/scale)
+        }
+    );
+
+    // Create new texture canvas
+    const textureCanvas = document.createElement('canvas');
+    textureCanvas.width = originalPiece.originalWidth * scale;
+    textureCanvas.height = originalPiece.originalHeight * scale;
+    const textureCtx = textureCanvas.getContext('2d');
+    textureCtx.drawImage(originalPiece.texture, 
+        0, 0, textureCanvas.width, textureCanvas.height);
+
+    // Replace old body
+    const index = cutPieces.findIndex(p => p.body === body);
+    World.remove(world, body);
+    
+    cutPieces[index] = {
+        body: newBody,
+        texture: textureCanvas,
+        originalWidth: originalPiece.originalWidth * scale,
+        originalHeight: originalPiece.originalHeight * scale,
+        localVertices: newVertices
+    };
+    
+    World.add(world, newBody);
+    selectedBody = newBody;
+}
+
+// Modified mouse handlers
+mainCanvas.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    
+    const mousePos = { x: e.offsetX, y: e.offsetY };
+    
+    if (currentTool === 'cut') {
+        isDrawing = true;
+        currentNeonPath = [mousePos];
+        lastCutPoint = mousePos;
+        cutIntensity = 0;
+    } else if (currentTool === 'pickup') {
+        const bodies = cutPieces.map(p => p.body);
+        const found = Query.point(bodies, mousePos);
+        if (found.length > 0) {
+            selectedBody = found[0];
+            Body.setStatic(selectedBody, false);
+            
+            grabConstraint = Constraint.create({
+                pointA: mousePos,
+                bodyB: selectedBody,
+                pointB: { x: 0, y: 0 },
+                stiffness: 0.7
+            });
+            World.add(world, grabConstraint);
+            mainCanvas.style.cursor = 'grabbing';
+        }
+    } else if (currentTool === 'draw') {
+        isDrawing = true;
+        currentNeonPath = [mousePos];
+    } else if (currentTool === 'resize') {
+        const bodies = cutPieces.map(p => p.body);
+        const found = Query.point(bodies, mousePos);
+        if (found.length > 0) {
+            selectedBody = found[0];
+            showResizeSlider();
         }
     }
 });
 
 mainCanvas.addEventListener('mousemove', (e) => {
-    const mouseX = e.offsetX;
-    const mouseY = e.offsetY;
+    const mousePos = { x: e.offsetX, y: e.offsetY };
     
-    if (isDrawing) {
-        currentNeonPath.push({ x: mouseX, y: mouseY });
-    } 
+    if (isDrawing && currentTool === 'cut') {
+        const dist = lastCutPoint ? Vector.magnitude(Vector.sub(mousePos, lastCutPoint)) : 0;
+        if (dist > minCutDistance) {
+            currentNeonPath.push(mousePos);
+            lastCutPoint = mousePos;
+            cutIntensity = Math.min(1, cutIntensity + 0.05);
+        }
+    }
     else if (currentTool === 'pickup' && grabConstraint) {
         // Update constraint position
-        grabConstraint.pointA = { x: mouseX, y: mouseY };
+        grabConstraint.pointA = { x: mousePos.x, y: mousePos.y };
     }
 });
 
@@ -366,8 +404,7 @@ mainCanvas.addEventListener('mouseup', (e) => {
 
 // Cut image along the drawn path
 function cutImageAlongPath(path) {
-    if (!imageLoaded || cutPieces.length === 0 || path.length < 5) return;
-    
+    if (cutPieces.length === 0 || path.length < 5) return; 
     // Make a temporary copy of cutPieces as we'll modify the array
     const currentPieces = [...cutPieces];
     cutPieces = [];
@@ -903,44 +940,30 @@ function createColorPicker() {
     `;
     document.head.appendChild(style);
 }
-
-// Game loop
 function update() {
-    // Clear the canvas
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-    
-    // Update physics
-    Engine.update(engine, 1000 / 60);
+    Engine.update(engine);
     
     // Draw background
     ctx.fillStyle = '#111111';
     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
     
-    // Draw pieces
-    for (let piece of cutPieces) {
+    // Draw pieces with containment
+    cutPieces.forEach(piece => {
         drawPiece(piece);
-        
-        // Keep pieces within canvas bounds
         const pos = piece.body.position;
         const bounds = piece.body.bounds;
         
-        // Check if piece is going out of bounds and adjust
-        if (bounds.min.x < 0 || bounds.max.x > canvasWidth || 
-            bounds.min.y < 0 || bounds.max.y > canvasHeight) {
-            
-            // Apply gentle force to push back into canvas
-            const center = { x: canvasWidth / 2, y: canvasHeight / 2 };
-            const direction = Vector.normalise(Vector.sub(center, pos));
-            const distance = Vector.magnitude(Vector.sub(center, pos));
-            const strength = 0.001 * Math.min(1, (distance / 300));
-            
-            Body.applyForce(piece.body, pos, Vector.mult(direction, strength));
-            
-            // Apply damping to slow pieces that try to leave
-            Body.setVelocity(piece.body, Vector.mult(piece.body.velocity, 0.95));
-            Body.setAngularVelocity(piece.body, piece.body.angularVelocity * 0.95);
+        // Enhanced containment
+        if (bounds.min.x < -50 || bounds.max.x > canvasWidth + 50 ||
+            bounds.min.y < -50 || bounds.max.y > canvasHeight + 50) {
+            const center = { x: canvasWidth/2, y: canvasHeight/2 };
+            const dir = Vector.normalise(Vector.sub(center, pos));
+            Body.applyForce(piece.body, pos, Vector.mult(dir, 0.01));
+            Body.setVelocity(piece.body, Vector.mult(piece.body.velocity, 0.9));
         }
-    }
+    });
+    
     
     // Draw permanent neon drawings
     for (let drawing of permanentDrawings) {
@@ -1087,15 +1110,14 @@ function createPhysicsControls() {
     document.head.appendChild(style);
 }
 
-// Improved function to initialize the application
+// Initialize application
 function init() {
     initCanvas();
     initPhysics();
     createColorPicker();
     createPhysicsControls();
-    setActiveTool('cut'); // Default tool
+    setActiveTool('cut');
     requestAnimationFrame(update);
 }
 
-// Initialize the application when the DOM is ready
 document.addEventListener('DOMContentLoaded', init);
