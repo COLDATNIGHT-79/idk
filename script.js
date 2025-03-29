@@ -279,7 +279,6 @@ function drawNeonLine(path, color = '#00ffff', opacity = 1) {
     ctx.stroke();
     ctx.restore();
 }
-
 // Mouse event handlers
 mainCanvas.addEventListener('mousedown', (e) => {
     if (e.button === 0) { // Left mouse button
@@ -287,6 +286,7 @@ mainCanvas.addEventListener('mousedown', (e) => {
         const mouseY = e.offsetY;
         
         if (currentTool === 'cut') {
+            // Only start drawing the cut line, no other behavior
             isDrawing = true;
             currentNeonPath = [{ x: mouseX, y: mouseY }];
         } 
@@ -332,7 +332,7 @@ mainCanvas.addEventListener('mousemove', (e) => {
     }
 });
 
-mainCanvas.addEventListener('mouseup', () => {
+mainCanvas.addEventListener('mouseup', (e) => {
     if (isDrawing) {
         isDrawing = false;
         
