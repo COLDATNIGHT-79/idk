@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Image Cutter</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <h2>Tools</h2>
+            <div class="tool-buttons">
+                <button id="cutTool" class="tool-button active">Cut Tool</button>
+                <button id="pickupTool" class="tool-button">Pickup Tool</button>
+                <button id="drawTool" class="tool-button">Draw Tool</button>
+            </div>
+            <div class="control-buttons">
+                <button id="uploadNew">Upload Image</button>
+                <button id="resetCanvas">Reset Canvas</button>
+            </div>
+            <input type="file" id="imageUpload" accept="image/*">
+        </div>
+        <div class="canvas-container">
+            <canvas id="mainCanvas"></canvas>
+        </div>
+    </div>
+    <script src="node_modules/matter-js/build/matter.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

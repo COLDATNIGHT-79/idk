@@ -1,0 +1,90 @@
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #0a0a0a;
+    color: #e0e0e0;
+    font-family: 'Orbitron', sans-serif;
+    overflow: hidden;
+    height: 100vh;
+}
+
+.container {
+    display: flex;
+    height: 100vh;
+}
+
+.sidebar {
+    width: 250px;
+    background-color: #111;
+    padding: 20px;
+    border-right: 2px solid #00ffff;
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.sidebar h2 {
+    color: #00ffff;
+    text-align: center;
+    margin: 0 0 20px 0;
+    text-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
+}
+
+.tool-buttons, .control-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.tool-button, #uploadNew, #resetCanvas {
+    padding: 12px;
+    background-color: #1a1a1a;
+    color: #00ffff;
+    border: 2px solid #00ffff;
+    border-radius: 5px;
+    cursor: pointer;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 14px;
+    transition: all 0.3s;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.tool-button:hover, #uploadNew:hover, #resetCanvas:hover {
+    background-color: #222;
+    box-shadow: 0 0 10px #00ffff;
+}
+
+.tool-button.active {
+    background-color: #00ffff;
+    color: #000;
+}
+
+.canvas-container {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+#mainCanvas {
+    background-color: #111;
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+    cursor: crosshair;
+}
+
+#imageUpload {
+    display: none;
+}
+
+@keyframes glow {
+    0% { box-shadow: 0 0 10px rgba(0, 255, 255, 0.5); }
+    50% { box-shadow: 0 0 20px rgba(0, 255, 255, 0.8); }
+    100% { box-shadow: 0 0 10px rgba(0, 255, 255, 0.5); }
+}
+
+.canvas-container #mainCanvas {
+    animation: glow 3s infinite;
+}
