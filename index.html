@@ -9,16 +9,26 @@
     <div class="container">
         <div class="sidebar">
             <h2>Tools</h2>
-            <div class="tool-buttons">
-                <button id="cutTool" class="tool-button active">Cut Tool</button>
-                <button id="pickupTool" class="tool-button">Pickup Tool</button>
-                <button id="drawTool" class="tool-button">Draw Tool</button>
+            <div class="tool-container">
+                <div class="tool-buttons">
+                    <button id="cutTool" class="tool-button active">Cut Tool</button>
+                    <button id="pickupTool" class="tool-button">Pickup Tool</button>
+                    <button id="drawTool" class="tool-button">Draw Tool</button>
+                    <button id="resizeTool" class="tool-button">Resize Tool</button>
+                </div>
+                <!-- Color wheel will be added here by JS -->
             </div>
             <div class="control-buttons">
                 <button id="uploadNew">Upload Image</button>
                 <button id="resetCanvas">Reset Canvas</button>
             </div>
-            <input type="file" id="imageUpload" accept="image/*">
+            <input type="file" id="imageUpload" accept="image/*" multiple>
+            <div class="instructions">
+                <p>- Cut: Draw a line to slice objects</p>
+                <p>- Pickup: Drag objects around</p>
+                <p>- Draw: Create neon drawings</p>
+                <p>- Resize: Select and scale objects</p>
+            </div>
         </div>
         <div class="canvas-container">
             <canvas id="mainCanvas"></canvas>

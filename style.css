@@ -31,6 +31,12 @@ body {
     text-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
 }
 
+.tool-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
 .tool-buttons, .control-buttons {
     display: flex;
     flex-direction: column;
@@ -79,6 +85,66 @@ body {
     display: none;
 }
 
+.color-wheel {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 10px 0;
+    padding: 10px;
+    background-color: #1a1a1a;
+    border-radius: 5px;
+    border: 1px solid #333;
+}
+
+.color-option {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid #333;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.color-option:hover {
+    transform: scale(1.2);
+    box-shadow: 0 0 10px currentColor;
+}
+
+.color-option.selected {
+    border: 2px solid white;
+    transform: scale(1.2);
+    box-shadow: 0 0 15px currentColor;
+}
+
+.resize-slider {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 200px;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 10px;
+    border-radius: 5px;
+    z-index: 1000;
+    border: 2px solid #00ffff;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+}
+
+.instructions {
+    margin-top: 20px;
+    padding: 10px;
+    background-color: #1a1a1a;
+    border-radius: 5px;
+    border: 1px solid #333;
+    font-size: 12px;
+}
+
+.instructions p {
+    margin: 5px 0;
+    color: #aaa;
+}
+
 @keyframes glow {
     0% { box-shadow: 0 0 10px rgba(0, 255, 255, 0.5); }
     50% { box-shadow: 0 0 20px rgba(0, 255, 255, 0.8); }
@@ -87,4 +153,35 @@ body {
 
 .canvas-container #mainCanvas {
     animation: glow 3s infinite;
+}
+
+/* Slider styling */
+input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 10px;
+    border-radius: 5px;  
+    background: #222;
+    outline: none;
+}
+
+input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #00ffff;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
+}
+
+input[type=range]::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #00ffff;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
+    border: none;
 }
