@@ -4,6 +4,18 @@
     <title>Image Cutter</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Ensuring resize slider is styled */
+        .resize-slider {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 200px;
+            height: 20px;
+            display: none;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -16,7 +28,8 @@
                     <button id="drawTool" class="tool-button">Draw Tool</button>
                     <button id="resizeTool" class="tool-button">Resize Tool</button>
                 </div>
-                <!-- Color wheel will be added here by JS -->
+                <!-- Color picker will be added here by JS -->
+                <!-- Physics controls will be added here by JS -->
             </div>
             <div class="control-buttons">
                 <button id="uploadNew">Upload Image</button>
@@ -34,7 +47,7 @@
             <canvas id="mainCanvas"></canvas>
         </div>
     </div>
-    <script src="node_modules/matter-js/build/matter.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

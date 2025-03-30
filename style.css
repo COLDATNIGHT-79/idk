@@ -185,3 +185,24 @@ input[type=range]::-moz-range-thumb {
     box-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
     border: none;
 }
+
+.slider-container {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.7);
+    padding: 10px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.scale-display {
+    color: #00ffff;
+    font-family: 'Orbitron', sans-serif;
+    min-width: 50px;
+    text-align: center;
+    text-shadow: 0 0 8px rgba(0,255,255,0.5);
+}

@@ -8,8 +8,17 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
   "dependencies": {
     "matter-js": "^0.20.0"
-  }
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/COLDATNIGHT-79/idk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/COLDATNIGHT-79/idk/issues"
+  },
+  "homepage": "https://github.com/COLDATNIGHT-79/idk#readme",
+  "description": ""
 }

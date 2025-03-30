@@ -6,13 +6,7 @@ const resetButton = document.getElementById('resetCanvas');
 const cutToolButton = document.getElementById('cutTool');
 const pickupToolButton = document.getElementById('pickupTool');
 const drawToolButton = document.getElementById('drawTool');
-
-// Create resize tool button
-const resizeToolButton = document.createElement('button');
-resizeToolButton.id = 'resizeTool';
-resizeToolButton.className = 'tool-button';
-resizeToolButton.textContent = 'Resize Tool';
-document.querySelector('.tool-buttons').appendChild(resizeToolButton);
+const resizeToolButton = document.getElementById('resizeTool');
 
 // Access Matter.js modules
 const { Engine, Render, World, Bodies, Body, Vertices, Vector, Composite, MouseConstraint, Mouse, Query, Constraint } = Matter;
@@ -36,7 +30,7 @@ let permanentDrawings = [];
 let selectedBody = null;
 let grabConstraint = null;
 let resizeSlider = null;
-
+let imageLoaded = false;
 // New variables for improved cutting
 const minCutDistance = 5;
 let lastCutPoint = null;
@@ -45,6 +39,11 @@ let cutIntensity = 0;
 // Color and style settings
 const neonLineWidth = 5;
 const neonShadowBlur = 15;
+// Add tool selection handlers
+cutToolButton.addEventListener('click', () => setActiveTool('cut'));
+pickupToolButton.addEventListener('click', () => setActiveTool('pickup'));
+drawToolButton.addEventListener('click', () => setActiveTool('draw'));
+resizeToolButton.addEventListener('click', () => setActiveTool('resize'));
 
 // Available drawing colors
 const colorOptions = [
@@ -83,9 +82,9 @@ function createBoundaries() {
     };
     
     const thickness = 100;
-    const buffer = 50;
-    
+    const buffer = 50; // Change thickness to buffer
     World.add(world, [
+        Bodies.rectangle(canvasWidth/2, canvasHeight + buffer/2, canvasWidth + buffer*2, buffer, wallOptions),
         Bodies.rectangle(canvasWidth/2, canvasHeight + thickness/2, canvasWidth + thickness*2, thickness, wallOptions), // bottom
         Bodies.rectangle(canvasWidth/2, -thickness/2, canvasWidth + thickness*2, thickness, wallOptions), // top
         Bodies.rectangle(-thickness/2, canvasHeight/2, thickness, canvasHeight + thickness*2, wallOptions), // left
@@ -117,6 +116,7 @@ function initCanvas() {
 function createImageBody(imgSrc, x = canvasWidth/2, y = canvasHeight/2) {
     const img = new Image();
     img.onload = function() {
+        imageLoaded = true;
         const aspectRatio = img.width / img.height;
         let imgWidth = Math.min(canvasWidth * 0.6, img.width);
         let imgHeight = imgWidth / aspectRatio;
@@ -154,7 +154,9 @@ function createImageBody(imgSrc, x = canvasWidth/2, y = canvasHeight/2) {
     };
     img.src = imgSrc;
 }
-
+uploadNewButton.addEventListener('click', () => {
+    imageUpload.click(); // Trigger hidden file input
+});
 // Event listeners for image upload
 imageUpload.addEventListener('change', (e) => {
     const files = e.target.files;
@@ -175,6 +177,12 @@ function setActiveTool(tool) {
     [cutToolButton, pickupToolButton, drawToolButton, resizeToolButton].forEach(btn => {
         btn.classList.remove('active');
     });
+
+    if (tool === 'cut' || tool === 'draw' || tool === 'resize') {
+        mouseConstraint.constraint.stiffness = 0; // Disable physics interaction
+    } else {
+        mouseConstraint.constraint.stiffness = 0.2; // Enable for pickup tool
+    }
     
     if (tool === 'cut') {
         cutToolButton.classList.add('active');
@@ -184,8 +192,8 @@ function setActiveTool(tool) {
         mainCanvas.style.cursor = 'grab';
     } else if (tool === 'draw') {
         drawToolButton.classList.add('active');
-        mainCanvas.style.cursor = 'pointer';
-    } else if (tool === 'resize') {
+        mainCanvas.style.cursor = 'crosshair'; // Changed from 'pointer'
+    }else if (tool === 'resize') {
         resizeToolButton.classList.add('active');
         mainCanvas.style.cursor = 'cell';
     }
@@ -218,7 +226,7 @@ function smoothPath(points, tension = 0.5) {
 
 // Improved cutting mechanics
 function cutImageAlongPath(path) {
-    if (path.length < 5) return;
+    if (cutPieces.length === 0 || path.length < 5) return;
     
     const smoothedPath = smoothPath(path);
     const currentPieces = [...cutPieces];
@@ -273,6 +281,47 @@ function showResizeSlider() {
 
 function hideResizeSlider() {
     if (resizeSlider) resizeSlider.style.display = 'none';
+}function drawNeonLine(path, color, opacity = 1) {
+    if (path.length < 2) return;
+
+    ctx.save();
+    ctx.beginPath();
+    
+    // Configure line style
+    ctx.strokeStyle = color;
+    ctx.lineWidth = neonLineWidth;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.shadowColor = color;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+
+    // Draw multiple layers for glow effect
+    const layers = [
+        { blur: neonShadowBlur * 2, alpha: opacity * 0.3 },
+        { blur: neonShadowBlur, alpha: opacity * 0.6 },
+        { blur: neonShadowBlur * 0.5, alpha: opacity }
+    ];
+
+    layers.forEach(layer => {
+        ctx.shadowBlur = layer.blur;
+        ctx.globalAlpha = layer.alpha;
+        
+        // Redraw the path for each layer
+        ctx.moveTo(path[0].x, path[0].y);
+        for (let i = 1; i < path.length; i++) {
+            ctx.lineTo(path[i].x, path[i].y);
+        }
+        ctx.stroke();
+    });
+
+    // Draw core line
+    ctx.globalAlpha = opacity;
+    ctx.shadowBlur = 0;
+    ctx.lineWidth = neonLineWidth * 0.7;
+    ctx.stroke();
+
+    ctx.restore();
 }
 
 function resizeBody(body, scale) {
@@ -317,20 +366,26 @@ function resizeBody(body, scale) {
     
     World.add(world, newBody);
     selectedBody = newBody;
+    newBody.position = body.position;
+Body.setPosition(newBody, body.position);
 }
 
-// Modified mouse handlers
+
 mainCanvas.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
     
     const mousePos = { x: e.offsetX, y: e.offsetY };
     
     if (currentTool === 'cut') {
+        // Disable physics interaction for cut tool
+        mouseConstraint.constraint.stiffness = 0;
         isDrawing = true;
         currentNeonPath = [mousePos];
         lastCutPoint = mousePos;
         cutIntensity = 0;
     } else if (currentTool === 'pickup') {
+        // Keep physics interaction for pickup tool
+        mouseConstraint.constraint.stiffness = 0.2;
         const bodies = cutPieces.map(p => p.body);
         const found = Query.point(bodies, mousePos);
         if (found.length > 0) {
@@ -347,9 +402,12 @@ mainCanvas.addEventListener('mousedown', (e) => {
             mainCanvas.style.cursor = 'grabbing';
         }
     } else if (currentTool === 'draw') {
+        // Disable physics interaction for draw tool
+        mouseConstraint.constraint.stiffness = 0;
         isDrawing = true;
         currentNeonPath = [mousePos];
     } else if (currentTool === 'resize') {
+        mouseConstraint.constraint.stiffness = 0;
         const bodies = cutPieces.map(p => p.body);
         const found = Query.point(bodies, mousePos);
         if (found.length > 0) {
@@ -362,7 +420,7 @@ mainCanvas.addEventListener('mousedown', (e) => {
 mainCanvas.addEventListener('mousemove', (e) => {
     const mousePos = { x: e.offsetX, y: e.offsetY };
     
-    if (isDrawing && currentTool === 'cut') {
+    if (isDrawing && (currentTool === 'cut' || currentTool === 'draw')) {
         const dist = lastCutPoint ? Vector.magnitude(Vector.sub(mousePos, lastCutPoint)) : 0;
         if (dist > minCutDistance) {
             currentNeonPath.push(mousePos);
@@ -376,29 +434,31 @@ mainCanvas.addEventListener('mousemove', (e) => {
     }
 });
 
+
 mainCanvas.addEventListener('mouseup', (e) => {
     if (isDrawing) {
         isDrawing = false;
         
         if (currentNeonPath.length > 1) {
             if (currentTool === 'cut') {
+                // Existing cut tool behavior
                 finishedNeonLines.push({ 
                     path: [...currentNeonPath], 
                     opacity: 1, 
                     color: drawingColor 
                 });
                 cutImageAlongPath(currentNeonPath);
-            } 
-            else if (currentTool === 'draw') {
+            } else if (currentTool === 'draw') {
+                // Modified draw tool behavior
                 permanentDrawings.push({
                     path: [...currentNeonPath],
-                    color: drawingColor
+                    color: drawingColor,
+                    opacity: 1 // Permanent opacity
                 });
             }
             currentNeonPath = [];
         }
-    } 
-    else if (currentTool === 'pickup') {
+    } else if (currentTool === 'pickup') {
         if (grabConstraint) {
             World.remove(world, grabConstraint);
             grabConstraint = null;
@@ -408,9 +468,12 @@ mainCanvas.addEventListener('mouseup', (e) => {
     }
 });
 
+
 // Cut image along the drawn path
 function cutImageAlongPath(path) {
     if (cutPieces.length === 0 || path.length < 5) return; 
+    if (!imageLoaded || cutPieces.length === 0 || path.length < 5) return;
+    
     // Make a temporary copy of cutPieces as we'll modify the array
     const currentPieces = [...cutPieces];
     cutPieces = [];
@@ -554,7 +617,7 @@ function splitPieceWithPath(piece, path) {
         return [piece]; // Can't cut if we don't have at least entry and exit points
     }
     
-    // Create two new polygons based on the curved cut path
+    // Create two new pieces based on the curved cut path
     const {hull1, hull2} = splitPolygonWithCurvedPath(piece, extendedPath, intersections);
     
     // Create two new pieces
@@ -807,285 +870,323 @@ function drawPiece(piece) {
     ctx.save();
     ctx.translate(pos.x, pos.y);
     ctx.rotate(angle);
-
-    // Draw the texture
-    const vertices = body.vertices;
     
-    // Clip to the shape of the piece
+    // Create a clipping path from the body vertices
     ctx.beginPath();
-    ctx.moveTo(vertices[0].x - pos.x, vertices[0].y - pos.y);
-    for (let i = 1; i < vertices.length; i++) {
-        ctx.lineTo(vertices[i].x - pos.x, vertices[i].y - pos.y);
+    const vertices = body.vertices;
+    if (vertices.length > 0) {
+        const firstVertex = vertices[0];
+        ctx.moveTo(firstVertex.x - pos.x, firstVertex.y - pos.y);
+        
+        for (let i = 1; i < vertices.length; i++) {
+            const vertex = vertices[i];
+            ctx.lineTo(vertex.x - pos.x, vertex.y - pos.y);
+        }
+        
+        ctx.closePath();
+        ctx.clip();
+        
+        // Draw the texture
+        const offsetX = piece.originalWidth / 2;
+        const offsetY = piece.originalHeight / 2;
+        ctx.drawImage(
+            piece.texture, 
+            -offsetX, 
+            -offsetY, 
+            piece.originalWidth, 
+            piece.originalHeight
+        );
     }
-    ctx.closePath();
-    ctx.clip();
     
-    // Draw the image
-    ctx.drawImage(
-        piece.texture, 
-        -piece.originalWidth / 2, 
-        -piece.originalHeight / 2,
-        piece.originalWidth,
-        piece.originalHeight
-    );
+    // Draw a subtle border
+    ctx.strokeStyle = 'rgba(0, 255, 255, 0.5)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
     
     ctx.restore();
 }
 
-// Create color wheel for drawing
-function createColorWheel() {
-    const colorWheel = document.createElement('div');
-    colorWheel.id = 'colorWheel';
-    colorWheel.className = 'color-wheel';
-    document.querySelector('.tool-container').appendChild(colorWheel);
+// Create color picker UI
+function createColorPicker() {
+    const sidebar = document.querySelector('.sidebar');
     
+    // Create color picker container
+    const colorPicker = document.createElement('div');
+    colorPicker.className = 'color-picker';
+    colorPicker.innerHTML = '<h3>Color Picker</h3>';
+    
+    // Create color swatches
+    const swatchContainer = document.createElement('div');
+    swatchContainer.className = 'color-swatches';
+    
+    // Add color options
     colorOptions.forEach(color => {
-        const colorOption = document.createElement('div');
-        colorOption.className = 'color-option';
-        colorOption.style.backgroundColor = color;
-        colorOption.addEventListener('click', () => {
-            drawingColor = color;
-            document.querySelectorAll('.color-option').forEach(opt => {
-                opt.classList.remove('selected');
+        const swatch = document.createElement('div');
+        swatch.className = 'color-swatch';
+        swatch.style.backgroundColor = color;
+        
+        // Mark active color
+        if (color === drawingColor) {
+            swatch.classList.add('active');
+        }
+        
+        // Add click handler
+        swatch.addEventListener('click', () => {
+            // Update active swatch
+            document.querySelectorAll('.color-swatch').forEach(s => {
+                s.classList.remove('active');
             });
-            colorOption.classList.add('selected');
+            swatch.classList.add('active');
+            
+            // Set the drawing color
+            drawingColor = color;
         });
-        colorWheel.appendChild(colorOption);
+        
+        swatchContainer.appendChild(swatch);
     });
     
-    // Select first color by default
-    colorWheel.querySelector('.color-option').classList.add('selected');
-}
-
-// Draw neon effect
-function drawNeonEffect(x, y, color = drawingColor, intensity = 1) {
-    ctx.shadowBlur = neonShadowBlur * intensity;
-    ctx.shadowColor = color;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = neonLineWidth;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    // Add eraser option
+    const eraser = document.createElement('div');
+    eraser.className = 'color-swatch eraser';
+    eraser.innerHTML = '❌'; // Eraser icon
+    eraser.addEventListener('click', () => {
+        permanentDrawings = []; // Clear drawings
+    });
     
-    // Draw the glow multiple times for stronger effect
-    for (let i = 0; i < 3; i++) {
-        ctx.beginPath();
-        ctx.arc(x, y, 2, 0, Math.PI * 2);
-        ctx.stroke();
-    }
+    swatchContainer.appendChild(eraser);
+    colorPicker.appendChild(swatchContainer);
+    
+    // Add to sidebar
+    sidebar.appendChild(colorPicker);
+    
+    // Add CSS for color picker
+    const style = document.createElement('style');
+    style.innerHTML = `
+        .color-picker {
+            margin-top: 20px;
+            border-top: 1px solid rgba(0, 255, 255, 0.3);
+            padding-top: 10px;
+        }
+        
+       .color-picker h3 {
+            font-size: 16px;
+            margin-bottom: 10px;
+            color: #00ffff;
+        }
+        
+        .color-swatches {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .color-swatch {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+        
+        .color-swatch:hover {
+            transform: scale(1.1);
+        }
+        
+        .color-swatch.active {
+            border-color: white;
+            box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+        }
+        
+        .eraser {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #333;
+            color: white;
+            font-size: 16px;
+        }
+    `;
+    document.head.appendChild(style);
 }
-
-// Render loop
-function render() {
+function update() {
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+    Engine.update(engine);
     
     // Draw background
-    ctx.fillStyle = '#111';
+    ctx.fillStyle = '#111111';
     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
     
-    // Apply physics engine update with fixed time step
-    Engine.update(engine, 16.667);
-    
-    // Draw all pieces
+    // Draw pieces with containment
     cutPieces.forEach(piece => {
-        if (piece && piece.body) {
-            // Keep objects within canvas boundaries with realistic bounce
-            if (piece.body.position.x < 0) {
-                Body.setPosition(piece.body, { 
-                    x: 10, 
-                    y: piece.body.position.y 
-                });
-                Body.setVelocity(piece.body, { 
-                    x: Math.abs(piece.body.velocity.x) * 0.5, 
-                    y: piece.body.velocity.y 
-                });
-            }
-            if (piece.body.position.x > canvasWidth) {
-                Body.setPosition(piece.body, { 
-                    x: canvasWidth - 10, 
-                    y: piece.body.position.y 
-                });
-                Body.setVelocity(piece.body, { 
-                    x: -Math.abs(piece.body.velocity.x) * 0.5, 
-                    y: piece.body.velocity.y 
-                });
-            }
-            if (piece.body.position.y < 0) {
-                Body.setPosition(piece.body, { 
-                    x: piece.body.position.x, 
-                    y: 10 
-                });
-                Body.setVelocity(piece.body, { 
-                    x: piece.body.velocity.x, 
-                    y: Math.abs(piece.body.velocity.y) * 0.5 
-                });
-            }
-            if (piece.body.position.y > canvasHeight) {
-                Body.setPosition(piece.body, { 
-                    x: piece.body.position.x, 
-                    y: canvasHeight - 10 
-                });
-                Body.setVelocity(piece.body, { 
-                    x: piece.body.velocity.x, 
-                    y: -Math.abs(piece.body.velocity.y) * 0.5 
-                });
-            }
-            
-            drawPiece(piece);
+        drawPiece(piece);
+        const pos = piece.body.position;
+        const bounds = piece.body.bounds;
+        
+        // Enhanced containment
+        if (bounds.min.x < -50 || bounds.max.x > canvasWidth + 50 ||
+            bounds.min.y < -50 || bounds.max.y > canvasHeight + 50) {
+            const center = { x: canvasWidth/2, y: canvasHeight/2 };
+            const dir = Vector.normalise(Vector.sub(center, pos));
+            Body.applyForce(piece.body, pos, Vector.mult(dir, 0.01));
+            Body.setVelocity(piece.body, Vector.mult(piece.body.velocity, 0.9));
         }
     });
     
-    // Draw current neon path
-    if (currentNeonPath.length > 1) {
-        ctx.shadowBlur = neonShadowBlur;
-        ctx.shadowColor = drawingColor;
-        ctx.strokeStyle = drawingColor;
-        ctx.lineWidth = neonLineWidth;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        
-        ctx.beginPath();
-        ctx.moveTo(currentNeonPath[0].x, currentNeonPath[0].y);
-        
-        for (let i = 1; i < currentNeonPath.length; i++) {
-            ctx.lineTo(currentNeonPath[i].x, currentNeonPath[i].y);
-        }
-        
-        ctx.stroke();
+    
+    // Draw permanent neon drawings
+    for (let drawing of permanentDrawings) {
+        drawNeonLine(drawing.path, drawing.color, 1); // Force full opacity
     }
     
-    // Draw finished neon lines with fade effect
-    finishedNeonLines.forEach((line, index) => {
-        if (line.opacity <= 0) {
-            finishedNeonLines.splice(index, 1);
-            return;
-        }
+    // Draw temporary cut/draw path
+    if (isDrawing && currentNeonPath.length > 1) {
+        drawNeonLine(currentNeonPath, drawingColor);
+    }
+    
+    // Draw finished cut lines with fading effect
+    for (let i = 0; i < finishedNeonLines.length; i++) {
+        const line = finishedNeonLines[i];
+        drawNeonLine(line.path, line.color, line.opacity);
         
-        ctx.shadowBlur = neonShadowBlur * line.opacity;
-        ctx.shadowColor = line.color;
-        ctx.strokeStyle = line.color;
-        ctx.lineWidth = neonLineWidth * line.opacity;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        
-        ctx.beginPath();
-        ctx.moveTo(line.path[0].x, line.path[0].y);
-        
-        for (let i = 1; i < line.path.length; i++) {
-            ctx.lineTo(line.path[i].x, line.path[i].y);
-        }
-        
-        ctx.stroke();
-        
-        // Fade out cut lines
+        // Fade out completed cut lines
         line.opacity -= 0.01;
-    });
-    
-    // Draw permanent drawings (from draw tool)
-    permanentDrawings.forEach(drawing => {
-        ctx.shadowBlur = neonShadowBlur;
-        ctx.shadowColor = drawing.color;
-        ctx.strokeStyle = drawing.color;
-        ctx.lineWidth = neonLineWidth;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        
-        ctx.beginPath();
-        ctx.moveTo(drawing.path[0].x, drawing.path[0].y);
-        
-        for (let i = 1; i < drawing.path.length; i++) {
-            ctx.lineTo(drawing.path[i].x, drawing.path[i].y);
+        if (line.opacity <= 0) {
+            finishedNeonLines.splice(i, 1);
+            i--;
         }
-        
-        ctx.stroke();
-    });
-    
-    // Draw resize UI if active
-    if (selectedBody && currentTool === 'resize') {
-        const pos = selectedBody.position;
-        ctx.strokeStyle = '#ffff00';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 5]);
-        
-        // Draw bounding box
-        const bounds = selectedBody.bounds;
-        ctx.beginPath();
-        ctx.rect(
-            bounds.min.x, 
-            bounds.min.y, 
-            bounds.max.x - bounds.min.x, 
-            bounds.max.y - bounds.min.y
-        );
-        ctx.stroke();
-        ctx.setLineDash([]);
     }
     
-    requestAnimationFrame(render);
+    // Draw constraint if active
+    if (grabConstraint && grabConstraint.bodyB) {
+        ctx.beginPath();
+        ctx.moveTo(grabConstraint.pointA.x, grabConstraint.pointA.y);
+        ctx.lineTo(grabConstraint.bodyB.position.x, grabConstraint.bodyB.position.y);
+        ctx.strokeStyle = 'rgba(0, 255, 255, 0.2)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+    
+    // Request next frame
+    requestAnimationFrame(update);
 }
 
-// Initialize everything
+// Generate UI elements for dragging and toggling gravity
+function createPhysicsControls() {
+    const sidebar = document.querySelector('.sidebar');
+    
+    // Create controls container
+    const controls = document.createElement('div');
+    controls.className = 'physics-controls';
+    controls.innerHTML = '<h3>Physics Controls</h3>';
+    
+    // Gravity slider
+    const gravityControl = document.createElement('div');
+    gravityControl.className = 'control-group';
+    
+    const gravityLabel = document.createElement('label');
+    gravityLabel.textContent = 'Gravity';
+    
+    const gravitySlider = document.createElement('input');
+    gravitySlider.type = 'range';
+    gravitySlider.min = '0';
+    gravitySlider.max = '1';
+    gravitySlider.step = '0.1';
+    gravitySlider.value = '0.5'; // Default gravity
+    
+    gravitySlider.addEventListener('input', () => {
+        world.gravity.y = parseFloat(gravitySlider.value);
+    });
+    
+    gravityControl.appendChild(gravityLabel);
+    gravityControl.appendChild(gravitySlider);
+    
+    // Bounce slider
+    const bounceControl = document.createElement('div');
+    bounceControl.className = 'control-group';
+    
+    const bounceLabel = document.createElement('label');
+    bounceLabel.textContent = 'Bounciness';
+    
+    const bounceSlider = document.createElement('input');
+    bounceSlider.type = 'range';
+    bounceSlider.min = '0';
+    bounceSlider.max = '1';
+    bounceSlider.step = '0.1';
+    bounceSlider.value = '0.6'; // Default restitution
+    
+    bounceSlider.addEventListener('input', () => {
+        const restitution = parseFloat(bounceSlider.value);
+        for (let piece of cutPieces) {
+            piece.body.restitution = restitution;
+        }
+    });
+    
+    bounceControl.appendChild(bounceLabel);
+    bounceControl.appendChild(bounceSlider);
+    
+    controls.appendChild(gravityControl);
+    controls.appendChild(bounceControl);
+    
+    // Add to sidebar
+    sidebar.appendChild(controls);
+    
+    // Add CSS for controls
+    const style = document.createElement('style');
+    style.innerHTML = `
+        .physics-controls {
+            margin-top: 20px;
+            border-top: 1px solid rgba(0, 255, 255, 0.3);
+            padding-top: 10px;
+        }
+        
+        .physics-controls h3 {
+            font-size: 16px;
+            margin-bottom: 10px;
+            color: #00ffff;
+        }
+        
+        .control-group {
+            margin-bottom: 10px;
+        }
+        
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #ccc;
+        }
+        
+        .control-group input[type="range"] {
+            width: 100%;
+            -webkit-appearance: none;
+            height: 8px;
+            border-radius: 4px;
+            background: #333;
+            outline: none;
+        }
+        
+        .control-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #00ffff;
+            cursor: pointer;
+            box-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+// Initialize application
 function init() {
     initCanvas();
     initPhysics();
-    createColorWheel();
-    
-    // Set initial tool
-    cutToolButton.classList.add('active');
-    
-    // Tool button events
-    cutToolButton.addEventListener('click', () => setActiveTool('cut'));
-    pickupToolButton.addEventListener('click', () => setActiveTool('pickup'));
-    drawToolButton.addEventListener('click', () => setActiveTool('draw'));
-    resizeToolButton.addEventListener('click', () => setActiveTool('resize'));
-    
-    // Other button events
-    uploadNewButton.addEventListener('click', () => imageUpload.click());
-    resetButton.addEventListener('click', () => {
-        resetPhysics();
-        finishedNeonLines = [];
-        permanentDrawings = [];
-    });
-    
-    // Start render loop
-    requestAnimationFrame(render);
+    createColorPicker();
+    createPhysicsControls();
+    setActiveTool('cut');
+    requestAnimationFrame(update);
 }
 
-// Start the application
-init();
-
-// Add CSS for the color wheel and resize slider
-const style = document.createElement('style');
-style.textContent = `
-.color-wheel {
-    display: flex;
-    justify-content: center;
-    margin-top: 10px;
-}
-.color-option {
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    margin: 0 5px;
-    cursor: pointer;
-    border: 2px solid #333;
-    transition: transform 0.2s;
-}
-.color-option:hover {
-    transform: scale(1.2);
-}
-.color-option.selected {
-    border: 2px solid white;
-    transform: scale(1.2);
-}
-.resize-slider {
-    position: absolute;
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 200px;
-    background: rgba(0, 0, 0, 0.7);
-    padding: 10px;
-    border-radius: 5px;
-    z-index: 1000;
-}
-`;
-document.head.appendChild(style);
+document.addEventListener('DOMContentLoaded', init);
