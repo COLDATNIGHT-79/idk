@@ -19,6 +19,9 @@
 </head>
 <body>
     <div class="container">
+     <h1>
+                <span style="color: green; text-shadow: 0 0 10px green; position: absolute; top: 10px; right: 10px;">Cut It</span>
+            </h1>
         <div class="sidebar">
             <h2>Tools</h2>
             <div class="tool-container">
@@ -27,20 +30,29 @@
                     <button id="pickupTool" class="tool-button">Pickup Tool</button>
                     <button id="drawTool" class="tool-button">Draw Tool</button>
                     <button id="resizeTool" class="tool-button">Resize Tool</button>
+                    <button id="filterTool" class="tool-button">Filter Tool</button>
                 </div>
-                <!-- Color picker will be added here by JS -->
-                <!-- Physics controls will be added here by JS -->
+
             </div>
             <div class="control-buttons">
                 <button id="uploadNew">Upload Image</button>
                 <button id="resetCanvas">Reset Canvas</button>
             </div>
             <input type="file" id="imageUpload" accept="image/*" multiple>
+           <!-- Add to your existing HTML -->
+<div id="filterPanel" class="filter-panel">
+    <h3>Filters</h3>
+    <div class="filter-option" data-filter="none">Original</div>
+    <div class="filter-option" data-filter="grayscale">Black & White</div>
+    <div class="filter-option" data-filter="sepia">Sepia</div>
+    <div class="filter-option" data-filter="saturate">Vibrant</div>
+</div>
             <div class="instructions">
                 <p>- Cut: Draw a line to slice objects</p>
                 <p>- Pickup: Drag objects around</p>
                 <p>- Draw: Create neon drawings</p>
                 <p>- Resize: Select and scale objects</p>
+                <p>- Filter: Apply filters to things</p>
             </div>
         </div>
         <div class="canvas-container">

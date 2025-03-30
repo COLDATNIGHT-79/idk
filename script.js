@@ -7,7 +7,9 @@ const cutToolButton = document.getElementById('cutTool');
 const pickupToolButton = document.getElementById('pickupTool');
 const drawToolButton = document.getElementById('drawTool');
 const resizeToolButton = document.getElementById('resizeTool');
-
+const filterToolButton = document.getElementById('filterTool');
+const filterPanel = document.getElementById('filterPanel');
+let selectedFilterPiece = null;
 // Access Matter.js modules
 const { Engine, Render, World, Bodies, Body, Vertices, Vector, Composite, MouseConstraint, Mouse, Query, Constraint } = Matter;
 
@@ -44,7 +46,7 @@ cutToolButton.addEventListener('click', () => setActiveTool('cut'));
 pickupToolButton.addEventListener('click', () => setActiveTool('pickup'));
 drawToolButton.addEventListener('click', () => setActiveTool('draw'));
 resizeToolButton.addEventListener('click', () => setActiveTool('resize'));
-
+filterToolButton.addEventListener('click', () => setActiveTool('filter'));
 // Available drawing colors
 const colorOptions = [
     '#00ffff', '#ff00ff', '#ffff00',
@@ -174,7 +176,7 @@ imageUpload.addEventListener('change', (e) => {
 // Tool selection with resize tool
 function setActiveTool(tool) {
     currentTool = tool;
-    [cutToolButton, pickupToolButton, drawToolButton, resizeToolButton].forEach(btn => {
+    [cutToolButton, pickupToolButton, drawToolButton, resizeToolButton, filterToolButton].forEach(btn => {
         btn.classList.remove('active');
     });
 
@@ -187,16 +189,26 @@ function setActiveTool(tool) {
     if (tool === 'cut') {
         cutToolButton.classList.add('active');
         mainCanvas.style.cursor = 'crosshair';
+        filterPanel.classList.remove('active');
     } else if (tool === 'pickup') {
         pickupToolButton.classList.add('active');
         mainCanvas.style.cursor = 'grab';
+         filterPanel.classList.remove('active');
     } else if (tool === 'draw') {
         drawToolButton.classList.add('active');
         mainCanvas.style.cursor = 'crosshair'; // Changed from 'pointer'
+         filterPanel.classList.remove('active');
     }else if (tool === 'resize') {
         resizeToolButton.classList.add('active');
         mainCanvas.style.cursor = 'cell';
+         filterPanel.classList.remove('active');
+    } else    if (tool === 'filter') {
+        filterToolButton.classList.add('active');
+        mainCanvas.style.cursor = 'pointer';
+        filterPanel.classList.add('active');
     }
+
+
     
     if (grabConstraint) {
         World.remove(world, grabConstraint);
@@ -414,6 +426,15 @@ mainCanvas.addEventListener('mousedown', (e) => {
             selectedBody = found[0];
             showResizeSlider();
         }
+    }else if (currentTool === 'filter') {
+        const mousePos = { x: e.offsetX, y: e.offsetY };
+        const bodies = cutPieces.map(p => p.body);
+        const found = Query.point(bodies, mousePos);
+        
+        if (found.length > 0) {
+            selectedFilterPiece = cutPieces.find(p => p.body === found[0]);
+            mainCanvas.style.cursor = 'cell';
+        }
     }
 });
 
@@ -557,7 +578,11 @@ function doesPathIntersectPiece(path, piece) {
     
     return false;
 }
-
+document.querySelectorAll('.filter-option').forEach(option => {
+    option.addEventListener('click', function() {
+        applyFilter(this.dataset.filter);
+    });
+});
 // Check if a point is inside a polygon
 function pointInPolygon(point, polygon) {
     let inside = false;
@@ -1178,7 +1203,54 @@ function createPhysicsControls() {
     `;
     document.head.appendChild(style);
 }
+function applyFilter(filterType) {
+    if (!selectedFilterPiece) return;
 
+    const texture = selectedFilterPiece.texture;
+    const ctx = texture.getContext('2d');
+    const imageData = ctx.getImageData(0, 0, texture.width, texture.height);
+    const data = imageData.data;
+
+    switch(filterType) {
+        case 'grayscale':
+            for (let i = 0; i < data.length; i += 4) {
+                const avg = (data[i] + data[i+1] + data[i+2]) / 3;
+                data[i] = avg;     // red
+                data[i+1] = avg;   // green
+                data[i+2] = avg;   // blue
+            }
+            break;
+            
+        case 'sepia':
+            for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i+1];
+                const b = data[i+2];
+                
+                data[i] = Math.min(255, (r * 0.393) + (g * 0.769) + (b * 0.189));
+                data[i+1] = Math.min(255, (r * 0.349) + (g * 0.686) + (b * 0.168));
+                data[i+2] = Math.min(255, (r * 0.272) + (g * 0.534) + (b * 0.131));
+            }
+            break;
+            
+        case 'saturate':
+            for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i+1];
+                const b = data[i+2];
+                
+                // Increase saturation by 50%
+                const max = Math.max(r, g, b);
+                data[i] = r + (max - r) * 0.5;
+                data[i+1] = g + (max - g) * 0.5;
+                data[i+2] = b + (max - b) * 0.5;
+            }
+            break;
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    selectedFilterPiece.texture = texture;
+}
 // Initialize application
 function init() {
     initCanvas();

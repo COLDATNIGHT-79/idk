@@ -185,7 +185,36 @@ input[type=range]::-moz-range-thumb {
     box-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
     border: none;
 }
+.filter-panel {
+    position: fixed;
+    right: -250px;
+    top: 20px;
+    width: 200px;
+    background: rgba(0, 0, 0, 0.9);
+    padding: 15px;
+    border-left: 2px solid #00ffff;
+    transition: right 0.3s ease;
+    box-shadow: -5px 0 15px rgba(0, 255, 255, 0.2);
+}
 
+.filter-panel.active {
+    right: 20px;
+}
+
+.filter-option {
+    padding: 10px;
+    margin: 5px 0;
+    background: #222;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.filter-option:hover {
+    background: #00ffff;
+    color: #000;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+}
 .slider-container {
     position: fixed;
     bottom: 30px;
