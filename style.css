@@ -81,6 +81,8 @@ body {
     cursor: crosshair;
 }
 
+
+
 #imageUpload {
     display: none;
 }
@@ -200,7 +202,52 @@ input[type=range]::-moz-range-thumb {
 .filter-panel.active {
     right: 20px;
 }
+/* Mobile-first adjustments */
+@media (max-width: 768px) {
+    .container {
+        flex-direction: column;
+        height: auto;
+    }
 
+    .sidebar {
+        width: 100%;
+        height: auto;
+        padding: 10px;
+        border-right: none;
+        border-bottom: 2px solid #00ffff;
+    }
+
+    .tool-buttons {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+
+    .tool-button, #uploadNew, #resetCanvas {
+        padding: 10px;
+        font-size: 12px;
+        flex: 1 1 45%;
+    }
+
+    .canvas-container {
+        order: -1;
+        height: 60vh;
+    }
+
+    .slider-container {
+        bottom: 10px;
+        padding: 8px;
+        transform: translateX(-50%) scale(0.9);
+    }
+}
+
+/* Touch optimization */
+button {
+    touch-action: manipulation;
+}
+
+#mainCanvas {
+    touch-action: none;
+}
 .filter-option {
     padding: 10px;
     margin: 5px 0;

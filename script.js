@@ -856,16 +856,36 @@ function createPieceFromPolygon(polygon, originalPiece) {
         
         if (!body) return null;
         
+        // Calculate the bounding box of the polygon
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const vertex of polygon) {
+            minX = Math.min(minX, vertex.x);
+            minY = Math.min(minY, vertex.y);
+            maxX = Math.max(maxX, vertex.x);
+            maxY = Math.max(maxY, vertex.y);
+        }
+
+        const width = maxX - minX;
+        const height = maxY - minY;
+
         // Create a new canvas for the texture
         const textureCanvas = document.createElement('canvas');
-        const width = originalPiece.originalWidth;
-        const height = originalPiece.originalHeight;
         textureCanvas.width = width;
         textureCanvas.height = height;
         const textureCtx = textureCanvas.getContext('2d');
         
         // Copy the texture from the original piece
-        textureCtx.drawImage(originalPiece.texture, 0, 0);
+        textureCtx.drawImage(
+            originalPiece.texture,
+            minX - originalPiece.body.position.x + originalPiece.originalWidth / 2,
+            minY - originalPiece.body.position.y + originalPiece.originalHeight / 2,
+            width,
+            height,
+            0,
+            0,
+            width,
+            height
+        );
         
         // Convert world vertices to local coordinates relative to the body
         const localVertices = body.vertices.map(vertex => ({
