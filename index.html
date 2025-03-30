@@ -15,13 +15,25 @@
             height: 20px;
             display: none;
         }
+        /* Optional styling for the new button */
+        #downloadScreenshot {
+            margin-top: 10px;
+            padding: 10px 20px;
+            background-color: #007BFF;
+            border: none;
+            color: #fff;
+            cursor: pointer;
+        }
+        #downloadScreenshot:hover {
+            background-color: #0056b3;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-     <h1>
-                <span style="color: green; text-shadow: 0 0 10px green; position: absolute; top: 10px; right: 10px;">Cut It</span>
-            </h1>
+        <h1>
+            <span style="color: green; text-shadow: 0 0 10px green; position: absolute; top: 10px; right: 10px;">Cut It</span>
+        </h1>
         <div class="sidebar">
             <h2>Tools</h2>
             <div class="tool-container">
@@ -32,21 +44,21 @@
                     <button id="resizeTool" class="tool-button">Resize Tool</button>
                     <button id="filterTool" class="tool-button">Filter Tool</button>
                 </div>
-
             </div>
             <div class="control-buttons">
                 <button id="uploadNew">Upload Image</button>
                 <button id="resetCanvas">Reset Canvas</button>
+                <!-- New button for downloading screenshot -->
+                <button id="downloadScreenshot">Download Image</button>
             </div>
             <input type="file" id="imageUpload" accept="image/*" multiple>
-           <!-- Add to your existing HTML -->
-<div id="filterPanel" class="filter-panel">
-    <h3>Filters</h3>
-    <div class="filter-option" data-filter="none">Original</div>
-    <div class="filter-option" data-filter="grayscale">Black & White</div>
-    <div class="filter-option" data-filter="sepia">Sepia</div>
-    <div class="filter-option" data-filter="saturate">Vibrant</div>
-</div>
+            <div id="filterPanel" class="filter-panel">
+                <h3>Filters</h3>
+                <div class="filter-option" data-filter="none">Original</div>
+                <div class="filter-option" data-filter="grayscale">Black & White</div>
+                <div class="filter-option" data-filter="sepia">Sepia</div>
+                <div class="filter-option" data-filter="saturate">Vibrant</div>
+            </div>
             <div class="instructions">
                 <p>- Cut: Draw a line to slice objects</p>
                 <p>- Pickup: Drag objects around</p>
@@ -61,5 +73,27 @@
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     <script src="script.js"></script>
+    <script>
+        // Wait for the DOM to load before attaching event listeners
+        document.addEventListener("DOMContentLoaded", function () {
+            const downloadBtn = document.getElementById("downloadScreenshot");
+            const canvas = document.getElementById("mainCanvas");
+
+            downloadBtn.addEventListener("click", function () {
+                // Convert the canvas to a data URL
+                const imageURL = canvas.toDataURL("image/png");
+                
+                // Create a temporary link element
+                const link = document.createElement("a");
+                link.href = imageURL;
+                link.download = "capture.png";
+                
+                // Simulate a click on the link to trigger download
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            });
+        });
+    </script>
 </body>
 </html>
